@@ -88,7 +88,7 @@ const scene = new Scene(
         })
       ).json();
 
-      const movieMarkup = getMovieMarkup(movie);
+      const movieMarkup = getVerboseMovieMarkup(movie);
 
       let attachment = "";
       if (movie.posterUrlPreview) {
@@ -133,23 +133,8 @@ const scene = new Scene(
         const movies = (await response.json()).items;
 
         const movieMarkup = movies
-          .filter((movie) => movie.nameRu && movie.nameRu.trim())
-          .map((movie, index) => {
-            const ratingImdb = `⭐${strings["IMDB"]}: ${
-              movie.ratingImdb ? `${movie.ratingImdb}/10` : strings["NO_RATING"]
-            }`;
-            const ratingKinopoisk = `🎬${strings["KINOPOISK"]}: ${
-              movie.ratingKinopoisk
-                ? `${movie.ratingKinopoisk}/10`
-                : strings["NO_RATING"]
-            }`;
-
-            const tab = "⠀";
-
-            return `${index + 1}. ${
-              movie.nameRu
-            }\n${tab}${ratingKinopoisk}\n${tab}${ratingImdb}`;
-          })
+          .map(getShortMovieMarkup)
+          .map((markup, index) => `${index + 1}. ${markup}`)
           .join("\n");
 
         let attachment = "";
@@ -189,7 +174,7 @@ const scene = new Scene(
           return notFound(ctx);
         }
 
-        const movieMarkup = getMovieMarkup(movie);
+        const movieMarkup = getVerboseMovieMarkup(movie);
 
         let attachment = "";
         if (movie.posterUrlPreview) {
@@ -220,26 +205,10 @@ const scene = new Scene(
         if (movies.length === 0) {
           return notFound(ctx);
         }
-        if (movies.length > 1) {
-          movies = movies.slice(0, 1);
-        }
-        const movieMarkup = movies
-          .filter((movie) => movie.nameRu && movie.nameRu.trim())
-          .map((movie) => {
-            const ratingImdb = `⭐${strings["IMDB"]}: ${
-              movie.ratingImdb ? `${movie.ratingImdb}/10` : strings["NO_RATING"]
-            }`;
-            const ratingKinopoisk = `🎬${strings["KINOPOISK"]}: ${
-              movie.ratingKinopoisk
-                ? `${movie.ratingKinopoisk}/10`
-                : strings["NO_RATING"]
-            }`;
+        const movie = movies[0];
 
-            const tab = "⠀";
+        const movieMarkup = getShortMovieMarkup(movie);
 
-            return `${movie.nameRu}\n${tab}${ratingKinopoisk}\n${tab}${ratingImdb}`;
-          })
-          .join("\n");
         const attachment = await new Attachment(
           bot,
           movies[0].posterUrlPreview,
@@ -281,7 +250,22 @@ function notifyStartSearching(ctx) {
   ctx.reply(`🕵${strings["STARTED_SEARCH"]}`);
 }
 
-function getMovieMarkup(movie) {
+function getShortMovieMarkup(movie) {
+  const ratingImdb = `⭐${strings["IMDB"]}: ${
+    movie.ratingImdb ? `${movie.ratingImdb}/10` : strings["NO_RATING"]
+  }`;
+  const ratingKinopoisk = `🎬${strings["KINOPOISK"]}: ${
+    movie.ratingKinopoisk ? `${movie.ratingKinopoisk}/10` : strings["NO_RATING"]
+  }`;
+
+  const tab = "⠀";
+
+  return `${
+    movie.nameRu || movie.nameEn
+  }\n${tab}${ratingKinopoisk}\n${tab}${ratingImdb}`;
+}
+
+function getVerboseMovieMarkup(movie) {
   const ratingImdb = `⭐${strings["IMDB"]}: ${
     movie.ratingImdb ? `${movie.ratingImdb}/10` : strings["NO_RATING"]
   }`;
