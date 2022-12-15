@@ -5,8 +5,6 @@ const app = express();
 
 const bodyParser = require("body-parser");
 
-const strings = require("./src/strings.json");
-
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
@@ -18,22 +16,131 @@ const Stage = require("node-vk-bot-api/lib/stage");
 
 const { Attachment } = require("./src/adapters/attachments.js");
 
+const strings = require("./src/strings.json");
+const genres = require("./src/genres.json");
+const movieTypes = require("./src/movie-types.json");
+
 const bot = new VkBot({
   token: process.env["TOKEN"],
   confirmation: process.env["CONFIRMATION"],
 });
 
-const scene = new Scene(
+const pickScene = new Scene(
+  "pick",
+  (ctx) => {
+    ctx.scene.next();
+    ctx.reply(
+      `🤖${strings["CHOOSE_GENRE"]}`,
+      null,
+      Markup.keyboard(
+        genres.map(({ genre }) => genre).filter((label) => !!label)
+      ).oneTime()
+    );
+  },
+  (ctx) => {
+    ctx.session.genre = ctx.message.text;
+
+    ctx.scene.next();
+    ctx.reply(
+      `🤖${strings["CHOOSE_TYPE"]}`,
+      null,
+      Markup.keyboard(movieTypes.map(({ label }) => label)).oneTime()
+    );
+  },
+  (ctx) => {
+    ctx.session.type = ctx.message.text;
+
+    ctx.scene.next();
+    ctx.reply(
+      `🤖${strings["CHOOSE_RATING"]}`,
+      null,
+      Markup.keyboard(
+        new Array(10 + 1).fill(null).map((_, index) => index.toString())
+      ).oneTime()
+    );
+  },
+  async (ctx) => {
+    ctx.session.rating = +ctx.message.text;
+
+    ctx.scene.leave();
+    notifyStartSearching(ctx);
+
+    const genreId = genres.filter(({ genre }) => ctx.session.genre === genre)[0]
+      .id;
+    const movieType = movieTypes.filter(
+      ({ label }) => ctx.session.type === label
+    )[0].value;
+
+    const rating = ctx.session.rating;
+
+    const baseUrl = process.env["BASE_URL"];
+    const response = await fetch(
+      `${baseUrl}?genres=${genreId}&type=${movieType}&ratingFrom=${rating}&ratingTo=${rating}`,
+      {
+        method: "GET",
+        headers: {
+          "X-API-KEY": process.env["API_KEY"],
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const { items: movies } = await response.json();
+
+    if (movies.length === 0) {
+      return notFound(ctx);
+    }
+
+    const movie = await (
+      await fetch(`${baseUrl}/${movies[0].kinopoiskId}`, {
+        method: "GET",
+        headers: {
+          "X-API-KEY": process.env["API_KEY"],
+          "Content-Type": "application/json",
+        },
+      })
+    ).json();
+
+    const movieMarkup = getVerboseMovieMarkup(movie);
+
+    let attachment = "";
+    if (movie.posterUrlPreview) {
+      const userId = ctx.message.from_id || ctx.message.user_id;
+      attachment = await new Attachment(
+        bot,
+        movie.posterUrlPreview,
+        userId
+      ).getUrl();
+    }
+
+    ctx.reply(
+      `${strings["HAVE_FOUND_MOVIE"]}\n${movieMarkup}`,
+      attachment,
+      Markup.keyboard([strings["GET_MORE_MOVIES"]])
+    );
+    return ctx.scene.leave();
+  }
+);
+
+const startScene = new Scene(
   "start",
   (ctx) => {
     ctx.scene.next();
     ctx.reply(
       `🤖${strings["START_RESPONSE"]}`,
       null,
-      Markup.keyboard([strings["ACTION_FIND_MOVIE"]]).oneTime()
+      Markup.keyboard([
+        strings["ACTION_FIND_MOVIE"],
+        strings["ACTION_PICK_MOVIE"],
+      ]).oneTime()
     );
   },
   (ctx) => {
+    if (ctx.message.text === strings["ACTION_PICK_MOVIE"]) {
+      ctx.scene.leave();
+      return ctx.scene.enter("pick");
+    }
+
     ctx.session.action = strings["ACTION_FIND_MOVIE"];
 
     ctx.scene.next();
@@ -229,7 +336,7 @@ const scene = new Scene(
 );
 
 const session = new Session();
-const stage = new Stage(scene);
+const stage = new Stage(startScene, pickScene);
 
 bot.use(session.middleware());
 bot.use(stage.middleware());
