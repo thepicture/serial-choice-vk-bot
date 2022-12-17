@@ -309,9 +309,11 @@ const startScene = new Scene(
           },
         });
         let movies = (await response.json()).items;
+
         if (movies.length === 0) {
           return notFound(ctx);
         }
+
         const movie = movies[0];
 
         const movieMarkup = getShortMovieMarkup(movie);
@@ -341,15 +343,9 @@ const stage = new Stage(startScene, pickScene);
 bot.use(session.middleware());
 bot.use(stage.middleware());
 
-["start", "/start", strings["START"]].forEach((command) => {
+["start", "/start", strings["START"], strings["GET_MORE_MOVIES"], strings["GET_MOVIES"]].forEach((command) => {
   bot.command(command, (ctx) => {
     ctx.scene.enter("start");
-  });
-});
-
-[strings["GET_MORE_MOVIES"], strings["GET_MOVIES"]].forEach((command) => {
-  bot.command(command, (ctx) => {
-    ctx.scene.enter("start", 1);
   });
 });
 
