@@ -33,7 +33,11 @@ const pickScene = new Scene(
       `${locales["CHOOSE_GENRE"]}`,
       null,
       Markup.keyboard(
-        genres.map(({ genre }) => genre).filter((label) => !!label)
+        genres
+          .map(({ genre }) => genre)
+          .filter((label) => !!label)
+          .slice(0, 10)
+          .map((label) => [Markup.button(label)])
       ).oneTime()
     );
   },
@@ -44,7 +48,10 @@ const pickScene = new Scene(
     ctx.reply(
       `${locales["CHOOSE_TYPE"]}`,
       null,
-      Markup.keyboard(movieTypes.map(({ label }) => label)).oneTime()
+      Markup.keyboard(
+        movieTypes.map(({ label }) => label),
+        { columns: 1 }
+      ).oneTime()
     );
   },
   (ctx) => {
@@ -55,7 +62,9 @@ const pickScene = new Scene(
       `${locales["CHOOSE_RATING"]}`,
       null,
       Markup.keyboard(
-        new Array(10 + 1).fill(null).map((_, index) => index.toString())
+        new Array(10)
+          .fill(null)
+          .map((_, index) => [Markup.button((index + 1).toString())])
       ).oneTime()
     );
   },
@@ -148,14 +157,10 @@ const startScene = new Scene(
       `${locales["MOVIE_SEARCH_TYPE_RESPONSE"]}`,
       null,
       Markup.keyboard([
-        [
-          Markup.button(locales["FIND_MOVIE_BY_NAME"]),
-          Markup.button(locales["FIND_MOVIE_BY_ID"]),
-        ],
-        [
-          Markup.button(locales["RANDOM_MOVIE"]),
-          Markup.button(locales["SEARCH_RATING"]),
-        ],
+        [Markup.button(locales["FIND_MOVIE_BY_NAME"])],
+        [Markup.button(locales["FIND_MOVIE_BY_ID"])],
+        [Markup.button(locales["RANDOM_MOVIE"])],
+        [Markup.button(locales["SEARCH_RATING"])],
       ]).oneTime()
     );
   },
@@ -383,7 +388,7 @@ function getVerboseMovieMarkup(movie) {
     movie.ratingKinopoisk ? `${movie.ratingKinopoisk}/10` : locales["NO_RATING"]
   }`;
 
-  const movieMarkup = `${locales['FILM_INFO_TITLE']} ${
+  const movieMarkup = `${locales["FILM_INFO_TITLE"]} ${
     movie.nameRu || movie.nameEn
   }\n${ratingKinopoisk}\n${ratingImdb}\n${locales["RELEASED_IN"]} ${
     movie.year
