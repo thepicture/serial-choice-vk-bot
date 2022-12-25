@@ -25,6 +25,54 @@ const bot = new VkBot({
   confirmation: process.env["CONFIRMATION"],
 });
 
+const getRatingScene = new Scene(
+  "getRating",
+  (ctx) => {
+    ctx.scene.next();
+    ctx.reply(locales["ENTER_INPUT_RESPONSE"]);
+  },
+  async (ctx) => {
+    ctx.session.query = ctx.message.text;
+    ctx.scene.leave();
+
+    const url = `${process.env["BASE_URL"]}?keyword=${encodeURIComponent(
+      ctx.session.query
+    )}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "X-API-KEY": process.env["API_KEY"],
+        "Content-Type": "application/json",
+      },
+    });
+    let movies = (await response.json()).items;
+
+    if (movies.length === 0) {
+      return notFound(ctx);
+    }
+
+    const movie = movies[0];
+
+    const movieMarkup = getShortMovieMarkup(movie);
+
+    const userId = ctx.message.from_id || ctx.message.user_id;
+
+    const attachment = await new Attachment(
+      bot,
+      movies[0].posterUrlPreview,
+      userId
+    ).getUrl();
+    return ctx.reply(
+      `${locales["HAVE_FOUND_RATING"]}\n${movieMarkup}`,
+      attachment,
+      Markup.keyboard([
+        [Markup.button(locales["GET_MOVIES"])],
+        [Markup.button(locales["SEARCH_RATING"])],
+      ])
+    );
+  }
+);
+
 const pickScene = new Scene(
   "pick",
   (ctx) => {
@@ -125,7 +173,10 @@ const pickScene = new Scene(
     ctx.reply(
       `${locales["HAVE_FOUND_MOVIE"]}\n${movieMarkup}`,
       attachment,
-      Markup.keyboard([locales["GET_MORE_MOVIES"]])
+      Markup.keyboard([
+        [Markup.button(locales["GET_MORE_MOVIES"])],
+        [Markup.button(locales["SEARCH_RATING"])],
+      ])
     );
     return ctx.scene.leave();
   }
@@ -139,8 +190,9 @@ const startScene = new Scene(
       `${locales["START_RESPONSE"]}`,
       null,
       Markup.keyboard([
-        locales["ACTION_FIND_MOVIE"],
-        locales["ACTION_PICK_MOVIE"],
+        [Markup.button(locales["ACTION_FIND_MOVIE"])],
+        [Markup.button(locales["ACTION_PICK_MOVIE"])],
+        [Markup.button(locales["SEARCH_RATING"])],
       ]).oneTime()
     );
   },
@@ -148,6 +200,11 @@ const startScene = new Scene(
     if (ctx.message.text === locales["ACTION_PICK_MOVIE"]) {
       ctx.scene.leave();
       return ctx.scene.enter("pick");
+    }
+
+    if (ctx.message.text === locales["SEARCH_RATING"]) {
+      ctx.scene.leave();
+      return ctx.scene.enter("getRating");
     }
 
     ctx.session.action = locales["ACTION_FIND_MOVIE"];
@@ -215,7 +272,10 @@ const startScene = new Scene(
       ctx.reply(
         `${locales["HAVE_FOUND_MOVIE"]}\n${movieMarkup}`,
         attachment,
-        Markup.keyboard([locales["GET_MORE_MOVIES"]])
+        Markup.keyboard([
+          [Markup.button(locales["GET_MORE_MOVIES"])],
+          [Markup.button(locales["SEARCH_RATING"])],
+        ])
       );
       return ctx.scene.leave();
     }
@@ -259,7 +319,10 @@ const startScene = new Scene(
           return ctx.reply(
             `${locales["FILMS_FOUND"]}:\n${movieMarkup}`,
             attachment,
-            Markup.keyboard([locales["GET_MORE_MOVIES"]])
+            Markup.keyboard([
+              [Markup.button(locales["GET_MORE_MOVIES"])],
+              [Markup.button(locales["SEARCH_RATING"])],
+            ])
           );
         } else {
           return notFound(ctx);
@@ -300,39 +363,14 @@ const startScene = new Scene(
         return ctx.reply(
           `${locales["FOUND_ABSTRACT"]}\n${movieMarkup}`,
           attachment,
-          Markup.keyboard([locales["GET_MORE_MOVIES"]])
+          Markup.keyboard([
+            [Markup.button(locales["GET_MORE_MOVIES"])],
+            [Markup.button(locales["SEARCH_RATING"])],
+          ])
         );
       } else if (ctx.session.movieSearchType === locales["SEARCH_RATING"]) {
-        const url = `${process.env["BASE_URL"]}?keyword=${encodeURIComponent(
-          ctx.session.query
-        )}`;
-        const response = await fetch(url, {
-          method: "GET",
-          headers: {
-            "X-API-KEY": process.env["API_KEY"],
-            "Content-Type": "application/json",
-          },
-        });
-        let movies = (await response.json()).items;
-
-        if (movies.length === 0) {
-          return notFound(ctx);
-        }
-
-        const movie = movies[0];
-
-        const movieMarkup = getShortMovieMarkup(movie);
-
-        const attachment = await new Attachment(
-          bot,
-          movies[0].posterUrlPreview,
-          userId
-        ).getUrl();
-        return ctx.reply(
-          `${locales["HAVE_FOUND_RATING"]}\n${movieMarkup}`,
-          attachment,
-          Markup.keyboard([locales["GET_MOVIES"]])
-        );
+        ctx.scene.leave();
+        ctx.scene.enter("getRating", 1);
       } else {
         ctx.reply(locales["UNSUPPORTED_ACTION"]);
       }
@@ -343,7 +381,7 @@ const startScene = new Scene(
 );
 
 const session = new Session();
-const stage = new Stage(startScene, pickScene);
+const stage = new Stage(startScene, pickScene, getRatingScene);
 
 bot.use(session.middleware());
 bot.use(stage.middleware());
@@ -360,6 +398,14 @@ bot.use(stage.middleware());
     ctx.scene.enter("start");
   });
 });
+
+[locales["SEARCH_RATING"], locales["SEARCH_RATING"].toLowerCase()].forEach(
+  (command) => {
+    bot.command(command, (ctx) => {
+      ctx.scene.enter("getRating");
+    });
+  }
+);
 
 function notifyStartSearching(ctx) {
   ctx.reply(`${locales["STARTED_SEARCH"]}`);
@@ -403,7 +449,10 @@ function notFound(ctx) {
   return ctx.reply(
     locales["NO_RESULTS"],
     null,
-    Markup.keyboard([locales["GET_MORE_MOVIES"]])
+    Markup.keyboard([
+      [Markup.button(locales["GET_MORE_MOVIES"])],
+      [Markup.button(locales["SEARCH_RATING"])],
+    ])
   );
 }
 
