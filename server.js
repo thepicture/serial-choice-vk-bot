@@ -376,7 +376,7 @@ function getShortMovieMarkup(movie) {
   const tab = "⠀";
 
   return `${
-    movie.nameRu || movie.nameEn
+    movie.nameRu || movie.nameEn || movie.nameOriginal
   }\n${tab}${ratingKinopoisk}\n${tab}${ratingImdb}`;
 }
 
@@ -389,7 +389,7 @@ function getVerboseMovieMarkup(movie) {
   }`;
 
   const movieMarkup = `${locales["FILM_INFO_TITLE"]} ${
-    movie.nameRu || movie.nameEn
+    movie.nameRu || movie.nameEn || movie.nameOriginal
   }\n${ratingKinopoisk}\n${ratingImdb}\n${locales["RELEASED_IN"]} ${
     movie.year
   }\n${locales["GENRES"]}: ${movie.genres
