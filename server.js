@@ -30,7 +30,7 @@ const pickScene = new Scene(
   (ctx) => {
     ctx.scene.next();
     ctx.reply(
-      `🤖${locales["CHOOSE_GENRE"]}`,
+      `${locales["CHOOSE_GENRE"]}`,
       null,
       Markup.keyboard(
         genres.map(({ genre }) => genre).filter((label) => !!label)
@@ -42,7 +42,7 @@ const pickScene = new Scene(
 
     ctx.scene.next();
     ctx.reply(
-      `🤖${locales["CHOOSE_TYPE"]}`,
+      `${locales["CHOOSE_TYPE"]}`,
       null,
       Markup.keyboard(movieTypes.map(({ label }) => label)).oneTime()
     );
@@ -52,7 +52,7 @@ const pickScene = new Scene(
 
     ctx.scene.next();
     ctx.reply(
-      `🤖${locales["CHOOSE_RATING"]}`,
+      `${locales["CHOOSE_RATING"]}`,
       null,
       Markup.keyboard(
         new Array(10 + 1).fill(null).map((_, index) => index.toString())
@@ -127,7 +127,7 @@ const startScene = new Scene(
   (ctx) => {
     ctx.scene.next();
     ctx.reply(
-      `🤖${locales["START_RESPONSE"]}`,
+      `${locales["START_RESPONSE"]}`,
       null,
       Markup.keyboard([
         locales["ACTION_FIND_MOVIE"],
@@ -145,7 +145,7 @@ const startScene = new Scene(
 
     ctx.scene.next();
     ctx.reply(
-      `🔍${locales["MOVIE_SEARCH_TYPE_RESPONSE"]}`,
+      `${locales["MOVIE_SEARCH_TYPE_RESPONSE"]}`,
       null,
       Markup.keyboard([
         [
@@ -215,7 +215,7 @@ const startScene = new Scene(
       return ctx.scene.leave();
     }
 
-    ctx.reply(`✏️${locales["ENTER_INPUT_RESPONSE"]}`);
+    ctx.reply(`${locales["ENTER_INPUT_RESPONSE"]}`);
   },
   async (ctx) => {
     notifyStartSearching(ctx);
@@ -293,7 +293,7 @@ const startScene = new Scene(
         }
 
         return ctx.reply(
-          `${locales['FOUND_ABSTRACT']}\n${movieMarkup}`,
+          `${locales["FOUND_ABSTRACT"]}\n${movieMarkup}`,
           attachment,
           Markup.keyboard([locales["GET_MORE_MOVIES"]])
         );
@@ -343,21 +343,28 @@ const stage = new Stage(startScene, pickScene);
 bot.use(session.middleware());
 bot.use(stage.middleware());
 
-["start", "/start", locales["START"], locales["GET_MORE_MOVIES"], locales["GET_MOVIES"]].forEach((command) => {
+[
+  "start",
+  "/start",
+  locales["START"],
+  locales["START"].toLowerCase(),
+  locales["GET_MORE_MOVIES"],
+  locales["GET_MOVIES"],
+].forEach((command) => {
   bot.command(command, (ctx) => {
     ctx.scene.enter("start");
   });
 });
 
 function notifyStartSearching(ctx) {
-  ctx.reply(`🕵${locales["STARTED_SEARCH"]}`);
+  ctx.reply(`${locales["STARTED_SEARCH"]}`);
 }
 
 function getShortMovieMarkup(movie) {
-  const ratingImdb = `⭐${locales["IMDB"]}: ${
+  const ratingImdb = `${locales["IMDB"]}: ${
     movie.ratingImdb ? `${movie.ratingImdb}/10` : locales["NO_RATING"]
   }`;
-  const ratingKinopoisk = `🎬${locales["KINOPOISK"]}: ${
+  const ratingKinopoisk = `${locales["KINOPOISK"]}: ${
     movie.ratingKinopoisk ? `${movie.ratingKinopoisk}/10` : locales["NO_RATING"]
   }`;
 
@@ -369,19 +376,19 @@ function getShortMovieMarkup(movie) {
 }
 
 function getVerboseMovieMarkup(movie) {
-  const ratingImdb = `⭐${locales["IMDB"]}: ${
+  const ratingImdb = `${locales["IMDB"]}: ${
     movie.ratingImdb ? `${movie.ratingImdb}/10` : locales["NO_RATING"]
   }`;
-  const ratingKinopoisk = `🎬${locales["KINOPOISK"]}: ${
+  const ratingKinopoisk = `${locales["KINOPOISK"]}: ${
     movie.ratingKinopoisk ? `${movie.ratingKinopoisk}/10` : locales["NO_RATING"]
   }`;
 
-  const movieMarkup = `🎥${
+  const movieMarkup = `${locales['FILM_INFO_TITLE']} ${
     movie.nameRu || movie.nameEn
   }\n${ratingKinopoisk}\n${ratingImdb}\n${locales["RELEASED_IN"]} ${
     movie.year
   }\n${locales["GENRES"]}: ${movie.genres
-    .map((genre) => genre.genre)
+    .map(({ genre }) => genre)
     .join(", ")}\n${locales["MORE_INFO"]}: ${movie.webUrl}`;
 
   return movieMarkup;
