@@ -5,9 +5,6 @@ const app = express();
 
 const bodyParser = require("body-parser");
 
-const fetch = (...args) =>
-  import("node-fetch").then(({ default: fetch }) => fetch(...args));
-
 const VkBot = require("node-vk-bot-api");
 const Markup = require("node-vk-bot-api/lib/markup");
 const Scene = require("node-vk-bot-api/lib/scene");
@@ -19,6 +16,12 @@ const { Attachment } = require("./src/adapters/attachments.js");
 const locales = require("./src/locales.json");
 const genres = require("./src/genres.json");
 const movieTypes = require("./src/movie-types.json");
+
+const { MovieFetcher } = require("./src/MovieFetcher.js");
+const fetcher = new MovieFetcher({
+  baseUrl: process.env["BASE_URL"],
+  apiKey: process.env["API_KEY"],
+});
 
 const bot = new VkBot({
   token: process.env["TOKEN"],
@@ -35,17 +38,7 @@ const getRatingScene = new Scene(
     ctx.session.query = ctx.message.text;
     ctx.scene.leave();
 
-    const url = `${process.env["BASE_URL"]}?keyword=${encodeURIComponent(
-      ctx.session.query
-    )}`;
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        "X-API-KEY": process.env["API_KEY"],
-        "Content-Type": "application/json",
-      },
-    });
-    let movies = (await response.json()).items;
+    const movies = await fetcher.getByKeyword(ctx.session.query);
 
     if (movies.length === 0) {
       return notFound(ctx);
@@ -131,32 +124,18 @@ const pickScene = new Scene(
     const rating = ctx.session.rating;
 
     const baseUrl = process.env["BASE_URL"];
-    const response = await fetch(
-      `${baseUrl}?genres=${genreId}&type=${movieType}&ratingFrom=${rating}&ratingTo=${rating}`,
-      {
-        method: "GET",
-        headers: {
-          "X-API-KEY": process.env["API_KEY"],
-          "Content-Type": "application/json",
-        },
-      }
-    );
-
-    const { items: movies } = await response.json();
+    const movies = await fetcher.getByFilters({
+      genreId,
+      movieType,
+      ratingFrom: rating,
+      ratingTo: rating,
+    });
 
     if (movies.length === 0) {
       return notFound(ctx);
     }
 
-    const movie = await (
-      await fetch(`${baseUrl}/${movies[0].kinopoiskId}`, {
-        method: "GET",
-        headers: {
-          "X-API-KEY": process.env["API_KEY"],
-          "Content-Type": "application/json",
-        },
-      })
-    ).json();
+    const movie = await fetcher.getMovieByKinopoiskId(movies[0].kinopoiskId);
 
     const movieMarkup = getVerboseMovieMarkup(movie);
 
@@ -228,34 +207,11 @@ const startScene = new Scene(
 
     if (ctx.session.movieSearchType === locales["RANDOM_MOVIE"]) {
       notifyStartSearching(ctx);
-      const baseUrl = process.env["BASE_URL"];
-      const response = await fetch(`${baseUrl}/top`, {
-        method: "GET",
-        headers: {
-          "X-API-KEY": process.env["API_KEY"],
-          "Content-Type": "application/json",
-        },
-      });
+      const film = await fetcher.getRandomMovie();
 
-      const movies = await response.json();
+      const kinopoiskId = film.filmId;
 
-      const { films } = movies;
-
-      films.sort(() => (Math.random() > 0.5 ? 1 : -1));
-
-      const film = films.pop();
-
-      const randomMovieId = film.filmId;
-
-      const movie = await (
-        await fetch(`${baseUrl}/${randomMovieId}`, {
-          method: "GET",
-          headers: {
-            "X-API-KEY": process.env["API_KEY"],
-            "Content-Type": "application/json",
-          },
-        })
-      ).json();
+      const movie = await fetcher.getMovieByKinopoiskId(kinopoiskId);
 
       const movieMarkup = getVerboseMovieMarkup(movie);
 
@@ -292,17 +248,7 @@ const startScene = new Scene(
 
     if (ctx.session.action === locales["ACTION_FIND_MOVIE"]) {
       if (ctx.session.movieSearchType === locales["FIND_MOVIE_BY_NAME"]) {
-        const url = `${process.env["BASE_URL"]}?keyword=${encodeURIComponent(
-          ctx.session.query
-        )}`;
-        const response = await fetch(url, {
-          method: "GET",
-          headers: {
-            "X-API-KEY": process.env["API_KEY"],
-            "Content-Type": "application/json",
-          },
-        });
-        const movies = (await response.json()).items;
+        const movies = await fetcher.getByKeyword(ctx.session.query);
 
         const movieMarkup = movies
           .map(getShortMovieMarkup)
@@ -328,19 +274,10 @@ const startScene = new Scene(
           return notFound(ctx);
         }
       } else if (ctx.session.movieSearchType === locales["FIND_MOVIE_BY_ID"]) {
-        const url = `${process.env["BASE_URL"]}/${ctx.session.query}`;
-        const response = await fetch(url, {
-          method: "GET",
-          headers: {
-            "X-API-KEY": process.env["API_KEY"],
-            "Content-Type": "application/json",
-          },
-        });
-
         let movie;
 
         try {
-          movie = await response.json();
+          movie = await fetcher.getMovieByKinopoiskId(ctx.session.query);
         } catch {
           return notFound(ctx);
         }
