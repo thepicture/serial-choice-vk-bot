@@ -342,16 +342,22 @@ const advancedMovieSearchByNameScene = new Scene(
 const getRatingScene = new Scene(
   "getRating",
   (ctx) => {
+    logger.log(ctx, "entering get rating scene...");
     ctx.scene.next();
     ctx.reply(locales["ENTER_INPUT_RESPONSE"]);
   },
   async (ctx) => {
     ctx.session.query = ctx.message.text;
+    logger.log(
+      ctx,
+      "user wants to get rating of the movie " + ctx.session.query
+    );
     ctx.scene.leave();
 
     const movies = await movieFetcher.getByKeyword(ctx.session.query);
 
     if (movies.length === 0) {
+      logger.log(ctx, "the movie by the given name is not found");
       return notFound(ctx);
     }
 
@@ -366,6 +372,9 @@ const getRatingScene = new Scene(
       movies[0].posterUrlPreview,
       userId
     ).getUrl();
+
+    logger.log(ctx, "found a movie, showing its rating to the end user...");
+
     return ctx.reply(
       `${locales["HAVE_FOUND_RATING"]}\n${movieMarkup}`,
       attachment,
@@ -380,7 +389,9 @@ const getRatingScene = new Scene(
 const pickScene = new Scene(
   "pick",
   (ctx) => {
+    logger.log(ctx, "entering pick scene...");
     ctx.scene.next();
+    logger.log(ctx, "offering genres...");
     ctx.reply(
       `${locales["CHOOSE_GENRE"]}`,
       null,
@@ -395,6 +406,7 @@ const pickScene = new Scene(
   },
   (ctx) => {
     ctx.session.genre = ctx.message.text;
+    logger.log(ctx, "user prefers genre " + ctx.session.genre);
 
     ctx.scene.next();
     ctx.reply(
@@ -408,6 +420,8 @@ const pickScene = new Scene(
   },
   (ctx) => {
     ctx.session.type = ctx.message.text;
+
+    logger.log(ctx, "user prefers type " + ctx.session.type);
 
     ctx.scene.next();
     ctx.reply(
@@ -423,6 +437,8 @@ const pickScene = new Scene(
   async (ctx) => {
     ctx.session.rating = +ctx.message.text;
 
+    logger.log(ctx, "user prefers rating " + ctx.session.rating);
+
     ctx.scene.leave();
     notifyStartSearching(ctx);
 
@@ -434,7 +450,6 @@ const pickScene = new Scene(
 
     const rating = ctx.session.rating;
 
-    const baseUrl = process.env["BASE_URL"];
     const movies = await movieFetcher.getByFilters({
       genreId,
       movieType,
@@ -443,6 +458,10 @@ const pickScene = new Scene(
     });
 
     if (movies.length === 0) {
+      logger.log(
+        ctx,
+        "movies by the given genre, type and rating were not found"
+      );
       return notFound(ctx);
     }
 
@@ -462,6 +481,11 @@ const pickScene = new Scene(
       ).getUrl();
     }
 
+    logger.log(
+      ctx,
+      "found a movie by the given genre, type and rating, showing..."
+    );
+
     ctx.reply(
       `${locales["HAVE_FOUND_MOVIE"]}\n${movieMarkup}`,
       attachment,
@@ -477,6 +501,7 @@ const pickScene = new Scene(
 const startScene = new Scene(
   "start",
   (ctx) => {
+    logger.log(ctx, "enter start scene");
     delete ctx.session.tactics;
     ctx.scene.next();
     ctx.reply(
@@ -490,17 +515,21 @@ const startScene = new Scene(
     );
   },
   (ctx) => {
+    logger.log(ctx, "start scene: step 1: " + ctx.message.text);
     if (ctx.message.text === locales["ACTION_PICK_MOVIE"]) {
+      logger.log(ctx, "will pick a movie");
       ctx.scene.leave();
       return ctx.scene.enter("pick");
     }
 
     if (ctx.message.text === locales["SEARCH_RATING"]) {
+      logger.log(ctx, "will search rating");
       ctx.scene.leave();
       return ctx.scene.enter("getRating");
     }
 
     ctx.session.action = locales["ACTION_FIND_MOVIE"];
+    logger.log(ctx, "will find a movie");
 
     ctx.scene.next();
     ctx.reply(
@@ -516,10 +545,12 @@ const startScene = new Scene(
   },
   async (ctx) => {
     ctx.session.movieSearchType = ctx.message.text;
+    logger.log(ctx, "movie search type: " + ctx.message.text);
 
     ctx.scene.next();
 
     if (ctx.session.movieSearchType === locales["RANDOM_MOVIE"]) {
+      logger.log(ctx, "will search a random movie");
       notifyStartSearching(ctx);
       const film = await movieFetcher.getRandomMovie();
 
@@ -539,6 +570,8 @@ const startScene = new Scene(
         ).getUrl();
       }
 
+      logger.log(ctx, "notifying the user that movie is found...");
+
       ctx.reply(
         `${locales["HAVE_FOUND_MOVIE"]}\n${movieMarkup}`,
         attachment,
@@ -557,16 +590,24 @@ const startScene = new Scene(
     const userId = ctx.message.from_id || ctx.message.user_id;
 
     ctx.session.query = ctx.message.text;
+    logger.log(ctx, "will find movie because query is " + ctx.session.query);
 
     ctx.scene.leave();
 
     if (ctx.session.action === locales["ACTION_FIND_MOVIE"]) {
+      logger.log(ctx, "will find a movie");
       if (ctx.session.movieSearchType === locales["FIND_MOVIE_BY_NAME"]) {
+        logger.log(ctx, "will find a movie by name");
         const movies = await movieFetcher.getByKeyword(ctx.session.query);
 
         if (movies.length === 0) {
+          logger.log(
+            ctx,
+            "movies by the given name " + ctx.session.query + " were not found"
+          );
           return notFound(ctx);
         } else if (movies.length === 1) {
+          logger.log(ctx, "found a single movie by name");
           const movieMarkup = movies
             .map(getShortMovieMarkup)
             .map((markup, index) => `${index + 1}. ${markup}`)
@@ -589,20 +630,30 @@ const startScene = new Scene(
             );
           }
         } else {
+          logger.log(ctx, "found many movies by name (" + movies.length + ")");
           ctx.session.movies = movies;
           ctx.scene.leave();
           return ctx.scene.enter("advancedMovieSearchByName");
         }
       } else if (ctx.session.movieSearchType === locales["FIND_MOVIE_BY_ID"]) {
+        logger.log(ctx, "will find the movie by its id");
         let movie;
 
         try {
           movie = await movieFetcher.getMovieByKinopoiskId(ctx.session.query);
-        } catch {
+        } catch (error) {
+          logger.log(
+            ctx,
+            "can't find the movie by id, error occured: " + error
+          );
           return notFound(ctx);
         }
 
         if (!movie || movie.message) {
+          logger.log(
+            ctx,
+            "no movie or its message, giving 404 error to the end user"
+          );
           return notFound(ctx);
         }
 
@@ -617,6 +668,8 @@ const startScene = new Scene(
           ).getUrl();
         }
 
+        logger.log(ctx, "found the movie by id, showing to the end user");
+
         return ctx.reply(
           `${locales["FOUND_ABSTRACT"]}\n${movieMarkup}`,
           attachment,
@@ -626,12 +679,18 @@ const startScene = new Scene(
           ])
         );
       } else if (ctx.session.movieSearchType === locales["SEARCH_RATING"]) {
+        logger.log(ctx, "will find the movie by its rating");
         ctx.scene.leave();
         ctx.scene.enter("getRating", 1);
       } else {
+        logger.log(
+          ctx,
+          "unsupported movie search type: " + ctx.session.movieSearchType
+        );
         ctx.reply(locales["UNSUPPORTED_ACTION"]);
       }
     } else {
+      logger.log(ctx, "unsupported action: " + ctx.session.action);
       ctx.reply(locales["UNSUPPORTED_ACTION"]);
     }
   }
@@ -659,6 +718,7 @@ bot.use(stage.middleware());
   locales["GET_MORE_MOVIES"],
   locales["GET_MOVIES"],
 ].forEach((command) => {
+  logger.genericLog("start command registered: " + command);
   bot.command(command, (ctx) => {
     ctx.scene.enter("start");
   });
@@ -666,6 +726,7 @@ bot.use(stage.middleware());
 
 [locales["SEARCH_RATING"], locales["SEARCH_RATING"].toLowerCase()].forEach(
   (command) => {
+    logger.genericLog("search rating command registered: " + command);
     bot.command(command, (ctx) => {
       ctx.scene.enter("getRating");
     });
@@ -673,6 +734,7 @@ bot.use(stage.middleware());
 );
 
 function notifyStartSearching(ctx) {
+  logger.log(ctx, "started searching");
   ctx.reply(`${locales["STARTED_SEARCH"]}`);
 }
 
@@ -711,6 +773,7 @@ function getVerboseMovieMarkup(movie) {
 }
 
 function notFound(ctx) {
+  logger.log(ctx, "not found");
   return ctx.reply(
     locales["NO_RESULTS"],
     null,

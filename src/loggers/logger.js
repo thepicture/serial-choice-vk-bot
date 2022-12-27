@@ -4,6 +4,10 @@ class Logger {
 
     console.log(`[${new Date().toISOString()}] [${fromId}] ${message}`);
   };
+
+  genericLog = (message) => {
+    console.log(`[${new Date().toISOString()}] [generic] ${message}`);
+  };
 }
 
 module.exports = {
