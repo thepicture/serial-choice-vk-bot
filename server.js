@@ -374,7 +374,9 @@ const getRatingScene = new Scene(
 
     const movie = movies[0];
 
-    const movieMarkup = getShortMovieMarkup(movie);
+    const movieMarkup = getShortMovieMarkup(
+      await movieFetcher.getMovieByKinopoiskId(movie.filmId)
+    );
 
     const userId = ctx.message.from_id || ctx.message.user_id;
 
