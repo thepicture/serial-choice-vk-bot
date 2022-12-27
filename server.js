@@ -165,10 +165,10 @@ const directorPickScene = new Scene(
     );
 
     const directorNames = directors
-      .filter((name, index, array) => array.indexOf(name) === index)
-      .slice(0, 10)
       .flat()
-      .map((director) => director.nameRu || director.nameEn);
+      .map((director) => director.nameRu || director.nameEn)
+      .filter((name, index, array) => array.indexOf(name) === index)
+      .slice(0, 10);
 
     const markup = Markup.keyboard(
       directorNames.map((directorName) => Markup.button(directorName), {
