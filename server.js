@@ -233,7 +233,9 @@ const advancedMovieSearchByNameScene = new Scene(
     if (ctx.session.movies.length === 1) {
       logger.log(ctx, "found exactly one movie");
 
-      const movie = ctx.session.movies.pop();
+      const movie = await movieFetcher.getMovieByKinopoiskId(
+        ctx.session.movies.pop().filmId
+      );
 
       const movieMarkup = getShortMovieMarkup(movie);
 
@@ -295,7 +297,9 @@ const advancedMovieSearchByNameScene = new Scene(
 
       logger.log(
         ctx,
-        "current tactics left: " + ctx.session.tactics.join(", ")
+        "current tactics left: " + ctx.session.tactics.length === 0
+          ? "none"
+          : ctx.session.tactics.join(", ")
       );
 
       if (ctx.session.tactics.length === 0) {
@@ -303,7 +307,14 @@ const advancedMovieSearchByNameScene = new Scene(
           ctx,
           "no more tactics, leaving the scene and showing movies..."
         );
-        const movieMarkup = ctx.session.movies
+
+        const ratingFulfilledMovies = await Promise.all(
+          ctx.session.movies.slice(0, 3).map(async (movie) => {
+            return await movieFetcher.getMovieByKinopoiskId(movie.filmId);
+          })
+        );
+
+        const movieMarkup = ratingFulfilledMovies
           .map(getShortMovieMarkup)
           .map((markup, index) => `${index + 1}. ${markup}`)
           .join("\n");
