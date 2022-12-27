@@ -739,6 +739,18 @@ function notifyStartSearching(ctx) {
 }
 
 function getShortMovieMarkup(movie) {
+  let maybeDescription = "";
+
+  let maybeFilmId = "";
+
+  if ("filmId" in movie) {
+    maybeFilmId = movie.filmId;
+  }
+
+  if ("description" in movie) {
+    maybeDescription = movie.description;
+  }
+
   const ratingImdb = `${locales["IMDB"]}: ${
     movie.ratingImdb ? `${movie.ratingImdb}/10` : locales["NO_RATING"]
   }`;
@@ -748,9 +760,18 @@ function getShortMovieMarkup(movie) {
 
   const tab = "⠀";
 
-  return `${
-    movie.nameRu || movie.nameEn || movie.nameOriginal
-  }\n${tab}${ratingKinopoisk}\n${tab}${ratingImdb}`;
+  return `${movie.nameRu || movie.nameEn || movie.nameOriginal}\n${
+    maybeDescription
+      ? locales["DESCRIPTION"] + ": " + maybeDescription + "\n"
+      : ""
+  }${tab}${ratingKinopoisk}\n${tab}${ratingImdb}${
+    maybeFilmId
+      ? "\n" +
+        locales["MORE_INFO"] +
+        ": " +
+        locales["MOVIE_URL_PLACEHOLDER"].replace("{0}", maybeFilmId)
+      : ""
+  }`;
 }
 
 function getVerboseMovieMarkup(movie) {
