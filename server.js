@@ -786,6 +786,12 @@ function getShortMovieMarkup(movie) {
 }
 
 function getVerboseMovieMarkup(movie) {
+  let maybeDescription = "";
+
+  if ("description" in movie) {
+    maybeDescription = movie.description;
+  }
+
   const ratingImdb = `${locales["IMDB"]}: ${
     movie.ratingImdb ? `${movie.ratingImdb}/10` : locales["NO_RATING"]
   }`;
@@ -795,7 +801,11 @@ function getVerboseMovieMarkup(movie) {
 
   const movieMarkup = `${locales["FILM_INFO_TITLE"]} ${
     movie.nameRu || movie.nameEn || movie.nameOriginal
-  }\n${ratingKinopoisk}\n${ratingImdb}\n${locales["RELEASED_IN"]} ${
+  }\n${
+    maybeDescription
+      ? locales["DESCRIPTION"] + ": " + maybeDescription + "\n"
+      : ""
+  }${ratingKinopoisk}\n${ratingImdb}\n${locales["RELEASED_IN"]} ${
     movie.year
   }\n${locales["GENRES"]}: ${movie.genres
     .map(({ genre }) => genre)
