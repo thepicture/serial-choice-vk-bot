@@ -8,7 +8,10 @@ class MovieFetcher {
   }
 
   getByKeyword = async (keyword) => {
-    const url = `${this.baseUrl}?keyword=${encodeURIComponent(keyword)}`;
+    const deprecatedBaseUrl = this.baseUrl.replace("2.2", "2.1");
+    const url = `${deprecatedBaseUrl}/search-by-keyword?keyword=${encodeURIComponent(
+      keyword
+    )}`;
 
     const response = await fetch(url, {
       method: "GET",
@@ -20,9 +23,7 @@ class MovieFetcher {
 
     const json = await response.json();
 
-    const { items } = json;
-
-    return items;
+    return json.films;
   };
 
   getByFilters = async ({
