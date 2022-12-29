@@ -1,7 +1,13 @@
+const { Logger } = require("./loggers/logger");
+const { Randomizer } = require("./Randomizer");
+
 const fetch = (...args) =>
   import("node-fetch").then(({ default: fetch }) => fetch(...args));
 
 class MovieFetcher {
+  static MIN_MOVIE_ID = 298;
+  static MAX_MOVIE_ID = 1405508;
+
   constructor({ baseUrl, apiKey }) {
     this.baseUrl = baseUrl;
     this.apiKey = apiKey;
@@ -84,23 +90,35 @@ class MovieFetcher {
   };
 
   getRandomMovie = async () => {
-    const response = await fetch(`${this.baseUrl}/top`, {
-      method: "GET",
-      headers: {
-        "X-API-KEY": this.apiKey,
-        "Content-Type": "application/json",
-      },
-    });
+    const logger = new Logger();
+    for (let i = 0; i < 16; i++) {
+      const movieId = Randomizer.randint(
+        MovieFetcher.MIN_MOVIE_ID,
+        MovieFetcher.MAX_MOVIE_ID
+      );
 
-    const json = await response.json();
+      const response = await fetch(`${this.baseUrl}/${movieId}`, {
+        method: "GET",
+        headers: {
+          "X-API-KEY": this.apiKey,
+          "Content-Type": "application/json",
+        },
+      });
 
-    const { films: movies } = json;
+      let movie;
 
-    movies.sort(() => (Math.random() > 0.5 ? 1 : -1));
+      try {
+        movie = await response.json();
+      } catch {
+        logger.genericLog(
+          "invalid random movie id: " + movieId + ", continuing..."
+        );
+        await new Promise((r) => setTimeout(r, 50));
+        continue;
+      }
 
-    const movie = movies.pop();
-
-    return movie;
+      return movie;
+    }
   };
 }
 
