@@ -570,11 +570,7 @@ const startScene = new Scene(
     if (ctx.session.movieSearchType === locales["RANDOM_MOVIE"]) {
       logger.log(ctx, "will search a random movie");
       notifyStartSearching(ctx);
-      const film = await movieFetcher.getRandomMovie();
-
-      const kinopoiskId = film.filmId;
-
-      const movie = await movieFetcher.getMovieByKinopoiskId(kinopoiskId);
+      const movie = await movieFetcher.getRandomMovie();
 
       const movieMarkup = getVerboseMovieMarkup(movie);
 
@@ -793,30 +789,44 @@ function getShortMovieMarkup(movie) {
 }
 
 function getVerboseMovieMarkup(movie) {
-  let maybeDescription = "";
+  const rows = [];
 
-  if ("description" in movie) {
-    maybeDescription = movie.description;
+  rows.push(
+    `${locales["FILM_INFO_TITLE"]} ${
+      movie.nameRu || movie.nameEn || movie.nameOriginal
+    }`
+  );
+
+  if (movie.description) {
+    rows.push(`${locales["DESCRIPTION"]}: ${movie.description}`);
   }
 
-  const ratingImdb = `${locales["IMDB"]}: ${
-    movie.ratingImdb ? `${movie.ratingImdb}/10` : locales["NO_RATING"]
-  }`;
-  const ratingKinopoisk = `${locales["KINOPOISK"]}: ${
-    movie.ratingKinopoisk ? `${movie.ratingKinopoisk}/10` : locales["NO_RATING"]
-  }`;
+  rows.push(
+    movie.ratingImdb
+      ? `${locales["IMDB"]}: ${movie.ratingImdb}/10`
+      : `${locales["IMDB"]}: ${locales["NO_RATING"]}`
+  );
+  rows.push(
+    movie.ratingKinopoisk
+      ? `${locales["KINOPOISK"]}: ${movie.ratingKinopoisk}/10`
+      : `${locales["KINOPOISK"]}: ${locales["NO_RATING"]}`
+  );
 
-  const movieMarkup = `${locales["FILM_INFO_TITLE"]} ${
-    movie.nameRu || movie.nameEn || movie.nameOriginal
-  }\n${
-    maybeDescription
-      ? locales["DESCRIPTION"] + ": " + maybeDescription + "\n"
-      : ""
-  }${ratingKinopoisk}\n${ratingImdb}\n${locales["RELEASED_IN"]} ${
-    movie.year
-  }\n${locales["GENRES"]}: ${movie.genres
-    .map(({ genre }) => genre)
-    .join(", ")}\n${locales["MORE_INFO"]}: ${movie.webUrl}`;
+  if (movie.year) {
+    rows.push(`${locales["RELEASED_IN"]} ${movie.year}`);
+  }
+
+  if (movie.genres) {
+    rows.push(
+      `${locales["GENRES"]}: ${movie.genres
+        .map(({ genre }) => genre)
+        .join(", ")}`
+    );
+  }
+
+  rows.push(`${locales["MORE_INFO"]}: ${movie.webUrl}`);
+
+  const movieMarkup = rows.join("\n");
 
   return movieMarkup;
 }

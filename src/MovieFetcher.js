@@ -1,4 +1,4 @@
-const { Logger } = require("./loggers/logger");
+const { Logger } = require("./loggers/logger.js");
 const { Randomizer } = require("./Randomizer");
 
 const fetch = (...args) =>
@@ -110,12 +110,12 @@ class MovieFetcher {
       try {
         movie = await response.json();
       } catch {
-        logger.genericLog(
-          "invalid random movie id: " + movieId + ", continuing..."
-        );
+        logger.genericLog(`invalid random movie id: ${movieId}, continuing...`);
         await new Promise((r) => setTimeout(r, 50));
         continue;
       }
+
+      logger.genericLog(`${movieId} does exist`);
 
       return movie;
     }
