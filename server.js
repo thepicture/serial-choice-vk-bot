@@ -463,12 +463,17 @@ const pickScene = new Scene(
 
     const rating = ctx.session.rating;
 
-    const movies = await movieFetcher.getByFilters({
+    let movies = await movieFetcher.getByFilters({
       genreId,
       movieType,
       ratingFrom: rating,
-      ratingTo: rating,
+      ratingTo: "10",
     });
+
+    movies = movies.filter(
+      (movie) =>
+        movie.ratingKinopoisk && movie.ratingKinopoisk > ctx.session.rating
+    );
 
     if (movies.length === 0) {
       logger.log(
@@ -479,7 +484,7 @@ const pickScene = new Scene(
     }
 
     const movie = await movieFetcher.getMovieByKinopoiskId(
-      movies[0].kinopoiskId
+      movies[Math.floor(Math.random() * movies.length)].kinopoiskId
     );
 
     const movieMarkup = getVerboseMovieMarkup(movie);
