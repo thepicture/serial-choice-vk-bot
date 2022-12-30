@@ -15,7 +15,11 @@ const { Attachment } = require("./src/adapters/attachments.js");
 
 const { Logger } = require("./src/loggers/logger.js");
 
+const { SpellChecker } = require("./src/SpellChecker.js");
+
 const logger = new Logger();
+
+const spellChecker = new SpellChecker();
 
 const locales = require("./src/locales.json");
 const genres = require("./src/genres.json");
@@ -39,6 +43,35 @@ const bot = new VkBot({
   confirmation: process.env["CONFIRMATION"],
 });
 
+const spellCheckScene = new Scene(
+  "spellCheck",
+  (ctx) => {
+    ctx.scene.next();
+    ctx.reply(
+      locales["SPELL_CHECK_RESPONSE"].replace("{0}", ctx.session.spellCheckFix),
+      null,
+      Markup.keyboard([
+        [Markup.button(locales["YES"])],
+        [Markup.button(locales["NO"])],
+      ])
+    );
+  },
+  (ctx) => {
+    ctx.session.isAskedUserAboutSpellCheckFix = true;
+    const answer = ctx.message.text;
+
+    if (answer === locales["YES"]) {
+      ctx.session.userPrefersSpellCheckFix = true;
+      ctx.session.query = ctx.session.spellCheckFix;
+    } else {
+      ctx.session.userPrefersSpellCheckFix = false;
+    }
+
+    ctx.scene.leave();
+    ctx.scene.enter("start", 3);
+  }
+);
+
 const yearPickScene = new Scene(
   "yearPick",
   (ctx) => {
@@ -53,7 +86,7 @@ const yearPickScene = new Scene(
         .map((movie) => parseInt(movie.year))
     );
 
-    logger.log(ctx, "min year: " + minYear + ", max year: " + maxYear);
+    logger.log(ctx, `min year: ${minYear}, max year: ${maxYear}`);
 
     const divisor = Math.floor((maxYear - minYear) / 2) + minYear;
     ctx.session.divisor = divisor;
@@ -75,11 +108,11 @@ const yearPickScene = new Scene(
     };
 
     const isBefore = ctx.message.text.includes(locales["BEFORE_YEAR"]);
-    logger.log(ctx, "user wants before the year: " + (isBefore ? "yes" : "no"));
+    logger.log(ctx, `user wants before the year: ${isBefore ? "yes" : "no"}`);
 
     logger.log(
       ctx,
-      "movie length before filtering: " + ctx.session.movies.length
+      `movie length before filtering: ${ctx.session.movies.length}`
     );
 
     const { divisor } = ctx.session;
@@ -95,7 +128,7 @@ const yearPickScene = new Scene(
     }
     logger.log(
       ctx,
-      "movie length after filtering: " + ctx.session.movies.length
+      `movie length after filtering: ${ctx.session.movies.length}`
     );
     logger.log(ctx, "returning to advanced movie search by name scene...");
 
@@ -126,11 +159,11 @@ const genrePickScene = new Scene(
   (ctx) => {
     const genreChoice = ctx.message.text;
 
-    logger.log(ctx, "user wants genre " + genreChoice);
+    logger.log(ctx, `user wants genre ${genreChoice}`);
 
     logger.log(
       ctx,
-      "movie length before filtering: " + ctx.session.movies.length
+      `movie length before filtering: ${ctx.session.movies.length}`
     );
 
     ctx.session.movies = ctx.session.movies.filter(
@@ -141,7 +174,7 @@ const genrePickScene = new Scene(
 
     logger.log(
       ctx,
-      "movie length after filtering: " + ctx.session.movies.length
+      `movie length after filtering: ${ctx.session.movies.length}`
     );
     logger.log(ctx, "returning to advanced movie search by name scene...");
 
@@ -184,11 +217,11 @@ const directorPickScene = new Scene(
   (ctx) => {
     const directorName = ctx.message.text;
 
-    logger.log(ctx, "user wants director: " + directorName);
+    logger.log(ctx, `user wants director: ${directorName}`);
 
     logger.log(
       ctx,
-      "movie length before filtering: " + ctx.session.movies.length
+      `movie length before filtering: ${ctx.session.movies.length}`
     );
 
     ctx.session.movies = ctx.session.movies.filter(
@@ -202,7 +235,7 @@ const directorPickScene = new Scene(
 
     logger.log(
       ctx,
-      "movie length after filtering: " + ctx.session.movies.length
+      `movie length after filtering: ${ctx.session.movies.length}`
     );
     logger.log(ctx, "returning to advanced movie search by name scene...");
 
@@ -219,7 +252,7 @@ const advancedMovieSearchByNameScene = new Scene(
     logger.log(ctx, "advanced movie search enter, step 0");
     const isFirstTime = !ctx.session.tactics;
 
-    logger.log(ctx, "first time: " + (isFirstTime ? "yes" : "no"));
+    logger.log(ctx, `first time: ${isFirstTime ? "yes" : "no"}`);
 
     if (typeof ctx.session.tactics === "undefined") {
       logger.log(ctx, "initialize tactics because they do not exist");
@@ -237,7 +270,7 @@ const advancedMovieSearchByNameScene = new Scene(
         ctx.session.movies.pop().filmId
       );
 
-      const movieMarkup = getShortMovieMarkup(movie);
+      const movieMarkup = getVerboseMovieMarkup(movie);
 
       const attachment = await new Attachment(
         bot,
@@ -361,7 +394,7 @@ const getRatingScene = new Scene(
     ctx.session.query = ctx.message.text;
     logger.log(
       ctx,
-      "user wants to get rating of the movie " + ctx.session.query
+      `user wants to get rating of the movie ${ctx.session.query}`
     );
     ctx.scene.leave();
 
@@ -419,7 +452,7 @@ const pickScene = new Scene(
   },
   (ctx) => {
     ctx.session.genre = ctx.message.text;
-    logger.log(ctx, "user prefers genre " + ctx.session.genre);
+    logger.log(ctx, `user prefers genre ${ctx.session.genre}`);
 
     ctx.scene.next();
     ctx.reply(
@@ -434,7 +467,7 @@ const pickScene = new Scene(
   (ctx) => {
     ctx.session.type = ctx.message.text;
 
-    logger.log(ctx, "user prefers type " + ctx.session.type);
+    logger.log(ctx, `user prefers type ${ctx.session.type}`);
 
     ctx.scene.next();
     ctx.reply(
@@ -450,7 +483,7 @@ const pickScene = new Scene(
   async (ctx) => {
     ctx.session.rating = +ctx.message.text;
 
-    logger.log(ctx, "user prefers rating " + ctx.session.rating);
+    logger.log(ctx, `user prefers rating ${ctx.session.rating}`);
 
     ctx.scene.leave();
     notifyStartSearching(ctx);
@@ -533,7 +566,11 @@ const startScene = new Scene(
     );
   },
   (ctx) => {
-    logger.log(ctx, "start scene: step 1: " + ctx.message.text);
+    ctx.session.isAskedUserAboutSpellCheckFix = false;
+    ctx.session.spellCheckFix = "";
+    ctx.session.userPrefersSpellCheckFix = false;
+
+    logger.log(ctx, `start scene: step 1: ${ctx.message.text}`);
     if (ctx.message.text === locales["ACTION_PICK_MOVIE"]) {
       logger.log(ctx, "will pick a movie");
       ctx.scene.leave();
@@ -563,7 +600,7 @@ const startScene = new Scene(
   },
   async (ctx) => {
     ctx.session.movieSearchType = ctx.message.text;
-    logger.log(ctx, "movie search type: " + ctx.message.text);
+    logger.log(ctx, `movie search type: ${ctx.message.text}`);
 
     ctx.scene.next();
 
@@ -604,7 +641,7 @@ const startScene = new Scene(
     const userId = ctx.message.from_id || ctx.message.user_id;
 
     ctx.session.query = ctx.message.text;
-    logger.log(ctx, "will find movie because query is " + ctx.session.query);
+    logger.log(ctx, `will find movie because query is ${ctx.session.query}`);
 
     ctx.scene.leave();
 
@@ -612,12 +649,44 @@ const startScene = new Scene(
       logger.log(ctx, "will find a movie");
       if (ctx.session.movieSearchType === locales["FIND_MOVIE_BY_NAME"]) {
         logger.log(ctx, "will find a movie by name");
+
+        const query = ctx.session.query;
+
+        const validationResults = spellChecker.getValidationResults(query);
+
+        if (
+          !ctx.session.isAskedUserAboutSpellCheckFix &&
+          !validationResults.isValid
+        ) {
+          ctx.session.spellCheckFix = validationResults.fix;
+
+          logger.log(
+            ctx,
+            `query "${query}" could be fixed to "${validationResults.fix}"`
+          );
+          logger.log(
+            ctx,
+            "asking user if he wants to use the changed version or does not..."
+          );
+
+          ctx.scene.leave();
+          return ctx.scene.enter("spellCheck");
+        }
+
+        if (ctx.session.userPrefersSpellCheckFix) {
+          ctx.session.query = ctx.session.spellCheckFix;
+          logger.log(
+            ctx,
+            `spell check fix applied: ${ctx.session.spellCheckFix}`
+          );
+        }
+
         const movies = await movieFetcher.getByKeyword(ctx.session.query);
 
         if (movies.length === 0) {
           logger.log(
             ctx,
-            "movies by the given name " + ctx.session.query + " were not found"
+            `movies by the given name ${ctx.session.query} were not found`
           );
           return notFound(ctx);
         } else if (movies.length === 1) {
@@ -644,7 +713,7 @@ const startScene = new Scene(
             );
           }
         } else {
-          logger.log(ctx, "found many movies by name (" + movies.length + ")");
+          logger.log(ctx, `found many movies by name (${movies.length})`);
           ctx.session.movies = movies;
           ctx.scene.leave();
           return ctx.scene.enter("advancedMovieSearchByName");
@@ -658,7 +727,7 @@ const startScene = new Scene(
         } catch (error) {
           logger.log(
             ctx,
-            "can't find the movie by id, error occured: " + error
+            `can't find the movie by id, error occured: ${error}`
           );
           return notFound(ctx);
         }
@@ -699,12 +768,12 @@ const startScene = new Scene(
       } else {
         logger.log(
           ctx,
-          "unsupported movie search type: " + ctx.session.movieSearchType
+          `unsupported movie search type: ${ctx.session.movieSearchType}`
         );
         ctx.reply(locales["UNSUPPORTED_ACTION"]);
       }
     } else {
-      logger.log(ctx, "unsupported action: " + ctx.session.action);
+      logger.log(ctx, `unsupported action: ${ctx.session.action}`);
       ctx.reply(locales["UNSUPPORTED_ACTION"]);
     }
   }
@@ -718,7 +787,8 @@ const stage = new Stage(
   advancedMovieSearchByNameScene,
   yearPickScene,
   genrePickScene,
-  directorPickScene
+  directorPickScene,
+  spellCheckScene
 );
 
 bot.use(session.middleware());
@@ -732,7 +802,7 @@ bot.use(stage.middleware());
   locales["GET_MORE_MOVIES"],
   locales["GET_MOVIES"],
 ].forEach((command) => {
-  logger.genericLog("start command registered: " + command);
+  logger.genericLog(`start command registered: ${command}`);
   bot.command(command, (ctx) => {
     ctx.scene.enter("start");
   });
@@ -740,7 +810,7 @@ bot.use(stage.middleware());
 
 [locales["SEARCH_RATING"], locales["SEARCH_RATING"].toLowerCase()].forEach(
   (command) => {
-    logger.genericLog("search rating command registered: " + command);
+    logger.genericLog(`search rating command registered: ${command}`);
     bot.command(command, (ctx) => {
       ctx.scene.enter("getRating");
     });
@@ -775,15 +845,13 @@ function getShortMovieMarkup(movie) {
   const tab = "⠀";
 
   return `${movie.nameRu || movie.nameEn || movie.nameOriginal}\n${
-    maybeDescription
-      ? locales["DESCRIPTION"] + ": " + maybeDescription + "\n"
-      : ""
+    maybeDescription ? `${locales["DESCRIPTION"]}: ${maybeDescription}\n` : ""
   }${tab}${ratingKinopoisk}\n${tab}${ratingImdb}${
     maybeFilmId
-      ? "\n" +
-        locales["MORE_INFO"] +
-        ": " +
-        locales["MOVIE_URL_PLACEHOLDER"].replace("{0}", maybeFilmId)
+      ? `\n${locales["MORE_INFO"]}: ${locales["MOVIE_URL_PLACEHOLDER"].replace(
+          "{0}",
+          maybeFilmId
+        )}`
       : ""
   }`;
 }
