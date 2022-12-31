@@ -32,6 +32,12 @@ const {
   EmptyArrayError,
   EmptyStringError,
 } = require("./src/InputParser.js");
+
+const {
+  PodcastFetcher,
+  PodcastNotFoundError,
+} = require("./src/PodcastFetcher");
+
 const { BestMovieCalculator } = require("./src/BestMovieCalculator.js");
 
 const movieFetcher = new MovieFetcher({
@@ -50,6 +56,8 @@ const bot = new VkBot({
   token: process.env["TOKEN"],
   confirmation: process.env["CONFIRMATION"],
 });
+
+const podcastFetcher = new PodcastFetcher(bot);
 
 const smartMoviePickScene = new Scene(
   "smartMoviePick",
@@ -372,7 +380,20 @@ const advancedMovieSearchByNameScene = new Scene(
         ctx.session.movies.pop().filmId
       );
 
-      const movieMarkup = getVerboseMovieMarkup(movie);
+      let movieMarkup = getVerboseMovieMarkup(movie);
+
+      const movieTitle = movie.nameRu || movie.nameEn;
+
+      try {
+        const podcast = await podcastFetcher.fetchByKeywordOrThrow(movieTitle);
+        movieMarkup += `\n\n${locales["PODCAST_FOUND"]}${podcast.id}`;
+      } catch (error) {
+        if (error instanceof PodcastNotFoundError) {
+          logger.log(ctx, `cannot find podcast for ${movieTitle}: ${error}`);
+        } else {
+          logger.log(ctx, `error during podcast fetch: ${error}`);
+        }
+      }
 
       const attachment = await new Attachment(
         bot,
