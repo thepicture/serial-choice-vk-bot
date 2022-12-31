@@ -97,4 +97,25 @@ describe("get validation results", () => {
 
     expect(expected).toMatchObject(actual);
   });
+
+  it("gives correct output for correct input with words of length less than 3", () => {
+    const expected = {
+      isValid: true,
+    };
+
+    const actual = checker.getValidationResults("человек а б в паук");
+
+    expect(expected).toMatchObject(actual);
+  });
+
+  it("should not check english names", () => {
+    const expected = {
+      isValid: false,
+      fix: 'человек spider паук'
+    };
+
+    const actual = checker.getValidationResults("человек spider поук");
+
+    expect(expected).toMatchObject(actual);
+  });
 });

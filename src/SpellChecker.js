@@ -15,6 +15,16 @@ class SpellChecker {
     const words = sanitizedQuery.split(" ");
 
     for (const userWord of words) {
+      if (/[A-Za-z0-1]+/g.test(userWord)) {
+        builder.push(userWord);
+        continue;
+      }
+
+      if (userWord.length < 3) {
+        builder.push(userWord);
+        continue;
+      }
+
       builder.push(closest(userWord, WORDS));
     }
 
