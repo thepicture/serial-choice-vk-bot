@@ -33,7 +33,13 @@ class SpellChecker {
     return validationResults;
   };
 
-  _sanitize = (query) => query.toLowerCase().replace(/[^a-zа-я]/g, " ");
+  _sanitize = (query) =>
+    query
+      .toLowerCase()
+      .replace(/[^a-zа-я]/g, " ")
+      .split(" ")
+      .filter((word) => !!word)
+      .join(" ");
 }
 
 module.exports = {

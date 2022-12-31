@@ -27,6 +27,12 @@ const movieTypes = require("./src/movie-types.json");
 
 const { MovieFetcher } = require("./src/MovieFetcher.js");
 const { StaffFetcher } = require("./src/StaffFetcher.js");
+const {
+  InputParser,
+  EmptyArrayError,
+  EmptyStringError,
+} = require("./src/InputParser.js");
+const { BestMovieCalculator } = require("./src/BestMovieCalculator.js");
 
 const movieFetcher = new MovieFetcher({
   baseUrl: process.env["BASE_URL"],
@@ -38,10 +44,106 @@ const staffFetcher = new StaffFetcher({
   apiKey: process.env["API_KEY"],
 });
 
+const inputParser = new InputParser();
+
 const bot = new VkBot({
   token: process.env["TOKEN"],
   confirmation: process.env["CONFIRMATION"],
 });
+
+const smartMoviePickScene = new Scene(
+  "smartMoviePick",
+  (ctx) => {
+    ctx.scene.next();
+    ctx.reply(locales["ENTER_FAVORITE_MOVIES"]);
+  },
+  (ctx) => {
+    try {
+      ctx.session.favoriteMovies = inputParser.parseCommaSeparatedValues(
+        ctx.message.text
+      );
+
+      ctx.scene.next();
+      ctx.reply(
+        locales["SHOULD_BOT_USE_GENRES"],
+        null,
+        Markup.keyboard([
+          [Markup.button(locales["YES"])],
+          [Markup.button(locales["NO"])],
+        ])
+      );
+    } catch (error) {
+      if (error instanceof EmptyArrayError) {
+        ctx.reply(locales["EMPTY_ARRAY_ERROR"]);
+      } else if (error instanceof EmptyStringError) {
+        ctx.reply(locales["EMPTY_STRING_ERROR"]);
+      }
+    }
+  },
+  (ctx) => {
+    if (ctx.message.text === locales["YES"]) {
+      ctx.session.shouldAskForFavoriteGenres = true;
+      ctx.scene.next();
+      ctx.reply(locales["ENTER_FAVORITE_GENRES"]);
+    } else {
+      ctx.scene.leave();
+      ctx.scene.enter("smartMoviePick", 3);
+    }
+  },
+  (ctx) => {
+    try {
+      if (ctx.session.shouldAskForFavoriteGenres) {
+        ctx.session.favoriteGenres = inputParser.parseCommaSeparatedValues(
+          ctx.message.text
+        );
+      }
+
+      ctx.scene.next();
+      ctx.reply(locales["ENTER_RATING_FROM_WHICH_TO_SEARCH"]);
+    } catch (error) {
+      if (error instanceof EmptyArrayError) {
+        ctx.reply(locales["EMPTY_ARRAY_ERROR"]);
+      } else if (error instanceof EmptyStringError) {
+        ctx.reply(locales["EMPTY_STRING_ERROR"]);
+      }
+    }
+  },
+  async (ctx) => {
+    ctx.session.ratingFromWhichToSearch = +ctx.message.text;
+
+    const movies = await new BestMovieCalculator().calculate({
+      movieNames: ctx.session.favoriteMovies,
+      genreName: ctx.session.favoriteGenres,
+      ratingFromWhichToSearch: ctx.session.ratingFromWhichToSearch,
+    });
+
+    const markup = movies.map(getVerboseMovieMarkup).join("\n\n");
+
+    ctx.scene.leave();
+
+    if (movies.length === 0) {
+      return notFound(ctx);
+    } else {
+      const attachment = await new Attachment(
+        bot,
+        movies[0].posterUrlPreview,
+        ctx.message.from_id || ctx.message.user_id
+      ).getUrl();
+
+      ctx.reply(
+        `${locales["FILMS_FOUND"]}:\n${markup}`
+          .split("")
+          .slice(0, 4096)
+          .join(""),
+        attachment,
+        Markup.keyboard([
+          [Markup.button(locales["GET_MORE_MOVIES"])],
+          [Markup.button(locales["SEARCH_RATING"])],
+        ])
+      );
+    }
+  }
+);
 
 const spellCheckScene = new Scene(
   "spellCheck",
@@ -554,6 +656,10 @@ const startScene = new Scene(
   (ctx) => {
     logger.log(ctx, "enter start scene");
     delete ctx.session.tactics;
+    delete ctx.session.favoriteGenres;
+    delete ctx.session.favoriteMovies;
+    delete ctx.session.ratingFromWhichToSearch;
+
     ctx.scene.next();
     ctx.reply(
       `${locales["START_RESPONSE"]}`,
@@ -561,6 +667,7 @@ const startScene = new Scene(
       Markup.keyboard([
         [Markup.button(locales["ACTION_FIND_MOVIE"])],
         [Markup.button(locales["ACTION_PICK_MOVIE"])],
+        [Markup.button(locales["SMART_MOVIE_PICK"])],
         [Markup.button(locales["SEARCH_RATING"])],
       ]).oneTime()
     );
@@ -575,6 +682,12 @@ const startScene = new Scene(
       logger.log(ctx, "will pick a movie");
       ctx.scene.leave();
       return ctx.scene.enter("pick");
+    }
+
+    if (ctx.message.text === locales["SMART_MOVIE_PICK"]) {
+      logger.log(ctx, "will pick movies for user using smart pick");
+      ctx.scene.leave();
+      return ctx.scene.enter("smartMoviePick");
     }
 
     if (ctx.message.text === locales["SEARCH_RATING"]) {
@@ -727,7 +840,7 @@ const startScene = new Scene(
         } catch (error) {
           logger.log(
             ctx,
-            `can't find the movie by id, error occured: ${error}`
+            `can't find the movie by id, error occurred: ${error}`
           );
           return notFound(ctx);
         }
@@ -788,7 +901,8 @@ const stage = new Stage(
   yearPickScene,
   genrePickScene,
   directorPickScene,
-  spellCheckScene
+  spellCheckScene,
+  smartMoviePickScene
 );
 
 bot.use(session.middleware());
@@ -817,6 +931,16 @@ bot.use(stage.middleware());
   }
 );
 
+[
+  locales["SMART_MOVIE_PICK"],
+  locales["SMART_MOVIE_PICK"].toLowerCase(),
+].forEach((command) => {
+  logger.genericLog(`smart movie pick command registered: ${command}`);
+  bot.command(command, (ctx) => {
+    ctx.scene.enter("smartMoviePick");
+  });
+});
+
 function notifyStartSearching(ctx) {
   logger.log(ctx, "started searching");
   ctx.reply(`${locales["STARTED_SEARCH"]}`);
@@ -827,11 +951,11 @@ function getShortMovieMarkup(movie) {
 
   let maybeFilmId = "";
 
-  if ("filmId" in movie) {
+  if (movie.filmId) {
     maybeFilmId = movie.filmId;
   }
 
-  if ("description" in movie) {
+  if (movie.description) {
     maybeDescription = movie.description;
   }
 

@@ -78,6 +78,8 @@ class MovieFetcher {
   };
 
   getMovieByKinopoiskId = async (kinopoiskId) => {
+    const logger = new Logger();
+
     const response = await fetch(`${this.baseUrl}/${kinopoiskId}`, {
       method: "GET",
       headers: {
@@ -86,7 +88,13 @@ class MovieFetcher {
       },
     });
 
-    return await response.json();
+    try {
+      return await response.json();
+    } catch {
+      logger.genericLog(
+        `error during getting a movie by kinopoisk id. response head: ${response.status} ${response.statusText}`
+      );
+    }
   };
 
   getRandomMovie = async () => {
@@ -119,6 +127,34 @@ class MovieFetcher {
 
       return movie;
     }
+  };
+
+  getSimilarMovies = async (kinopoiskId) => {
+    const logger = new Logger();
+
+    const response = await fetch(`${this.baseUrl}/${kinopoiskId}/similars`, {
+      method: "GET",
+      headers: {
+        "X-API-KEY": this.apiKey,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const text = await response.text();
+
+    let json;
+
+    try {
+      json = JSON.parse(text);
+    } catch {
+      logger.genericLog(`error occurred during json parse: ${text}`);
+    }
+
+    const { total, items } = json;
+
+    logger.genericLog(`got similar movies. count: ${total}`);
+
+    return items.slice(0, 10);
   };
 }
 

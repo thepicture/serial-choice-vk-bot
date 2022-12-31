@@ -76,4 +76,25 @@ describe("get validation results", () => {
 
     expect(expected).toMatchObject(actual);
   });
+
+  it("gives correct output for correct input with consecutive hyphens", () => {
+    const expected = {
+      isValid: true,
+    };
+
+    const actual = checker.getValidationResults("человек----паук");
+
+    expect(expected).toMatchObject(actual);
+  });
+
+  it("gives correct output for incorrect input with consecutive hyphens", () => {
+    const expected = {
+      isValid: false,
+      fix: "человек паук",
+    };
+
+    const actual = checker.getValidationResults("чиловек----поук");
+
+    expect(expected).toMatchObject(actual);
+  });
 });
