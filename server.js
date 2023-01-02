@@ -774,7 +774,10 @@ const startScene = new Scene(
     notifyStartSearching(ctx);
     const userId = ctx.message.from_id || ctx.message.user_id;
 
-    ctx.session.query = ctx.message.text;
+    if (!ctx.session.isAskedUserAboutSpellCheckFix) {
+      ctx.session.query = ctx.message.text;
+    }
+
     logger.log(ctx, `will find movie because query is ${ctx.session.query}`);
 
     ctx.scene.leave();
